@@ -224,12 +224,18 @@ public class RouteTable implements Describer {
      * @param timeoutMs timeout millis
      * @return operation status
      */
+    /**
+     * 根据groupId获取集群节点的配置信息，其中包括了其他节点的ip和端口号
+     * 遍历conf里面的集群节点
+     * 尝试连接被遍历的节点，如果连接不上直接continue换到下一个节点
+     * 向这个节点发送GetLeaderRequest请求，如果在超时时间内可以返回正常的响应，那么就调用updateLeader更新leader信息
+     */
     public Status refreshLeader(final CliClientService cliClientService, final String groupId, final int timeoutMs)
                                                                                                                    throws InterruptedException,
                                                                                                                    TimeoutException {
         Requires.requireTrue(!StringUtils.isBlank(groupId), "Blank group id");
         Requires.requireTrue(timeoutMs > 0, "Invalid timeout: " + timeoutMs);
-
+        //根据集群的id去获取集群的配置信息，里面包括集群的ip和端口号
         final Configuration conf = getConfiguration(groupId);
         if (conf == null) {
             return new Status(RaftError.ENOENT,
@@ -238,9 +244,11 @@ public class RouteTable implements Describer {
         final Status st = Status.OK();
         final CliRequests.GetLeaderRequest.Builder rb = CliRequests.GetLeaderRequest.newBuilder();
         rb.setGroupId(groupId);
+        //发送获取leader节点的请求
         final CliRequests.GetLeaderRequest request = rb.build();
         TimeoutException timeoutException = null;
         for (final PeerId peer : conf) {
+            //如果连接不上，先设置状态为error，然后continue
             if (!cliClientService.connect(peer.getEndpoint())) {
                 if (st.isOk()) {
                     st.setError(-1, "Fail to init channel to %s", peer);
@@ -250,9 +258,11 @@ public class RouteTable implements Describer {
                 }
                 continue;
             }
+            //向这个节点发送获取leader的GetLeaderRequest请求
             final Future<Message> result = cliClientService.getLeader(peer.getEndpoint(), request, null);
             try {
                 final Message msg = result.get(timeoutMs, TimeUnit.MILLISECONDS);
+                //异常情况的处理
                 if (msg instanceof RpcRequests.ErrorResponse) {
                     if (st.isOk()) {
                         st.setError(-1, ((RpcRequests.ErrorResponse) msg).getErrorMsg());
@@ -262,6 +272,7 @@ public class RouteTable implements Describer {
                     }
                 } else {
                     final CliRequests.GetLeaderResponse response = (CliRequests.GetLeaderResponse) msg;
+                    //重置leader
                     updateLeader(groupId, response.getLeaderId());
                     return Status.OK();
                 }

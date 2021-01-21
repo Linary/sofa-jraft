@@ -16,7 +16,11 @@
  */
 package com.alipay.sofa.jraft.example.rheakv;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.alipay.sofa.jraft.rhea.options.PlacementDriverOptions;
+import com.alipay.sofa.jraft.rhea.options.RegionEngineOptions;
 import com.alipay.sofa.jraft.rhea.options.RheaKVStoreOptions;
 import com.alipay.sofa.jraft.rhea.options.StoreEngineOptions;
 import com.alipay.sofa.jraft.rhea.options.configured.PlacementDriverOptionsConfigured;
@@ -36,11 +40,13 @@ public class Server1 {
         final PlacementDriverOptions pdOpts = PlacementDriverOptionsConfigured.newConfigured()
                 .withFake(true) // use a fake pd
                 .config();
+
         final StoreEngineOptions storeOpts = StoreEngineOptionsConfigured.newConfigured() //
                 .withStorageType(StorageType.RocksDB)
                 .withRocksDBOptions(RocksDBOptionsConfigured.newConfigured().withDbPath(Configs.DB_PATH).config())
                 .withRaftDataPath(Configs.RAFT_DATA_PATH)
                 .withServerAddress(new Endpoint("127.0.0.1", 8181))
+                .withRegionEngineOptionsList(buildRegionEngineOptionsList())
                 .config();
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
                 .withClusterName(Configs.CLUSTER_NAME) //
@@ -49,9 +55,26 @@ public class Server1 {
                 .withPlacementDriverOptions(pdOpts) //
                 .config();
         System.out.println(opts);
+        // 这里的Node相当于是机器的意思
         final Node node = new Node(opts);
         node.start();
         Runtime.getRuntime().addShutdownHook(new Thread(node::stop));
         System.out.println("server1 start OK");
+    }
+
+    private static List<RegionEngineOptions> buildRegionEngineOptionsList() {
+        List<RegionEngineOptions> regionEngineOptionsList = new ArrayList<>();
+        RegionEngineOptions options1 = new RegionEngineOptions();
+        options1.setRegionId(1L);
+        options1.setStartKey(null);
+        options1.setEndKey("01000000");
+        regionEngineOptionsList.add(options1);
+
+        RegionEngineOptions options2 = new RegionEngineOptions();
+        options2.setRegionId(2L);
+        options2.setStartKey("01000000");
+        options2.setEndKey(null);
+        regionEngineOptionsList.add(options2);
+        return regionEngineOptionsList;
     }
 }

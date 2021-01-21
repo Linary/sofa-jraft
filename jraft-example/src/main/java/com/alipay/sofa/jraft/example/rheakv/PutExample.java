@@ -16,6 +16,7 @@
  */
 package com.alipay.sofa.jraft.example.rheakv;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -68,29 +69,43 @@ public class PutExample {
         }
 
         // put list
-        final KVEntry kv1 = new KVEntry(writeUtf8("10"), value);
-        final KVEntry kv2 = new KVEntry(writeUtf8("11"), value);
-        final KVEntry kv3 = new KVEntry(writeUtf8("12"), value);
-        final KVEntry kv4 = new KVEntry(writeUtf8("13"), value);
-        final KVEntry kv5 = new KVEntry(writeUtf8("14"), value);
-
-        List<KVEntry> entries = Lists.newArrayList(kv1, kv2, kv3);
-
-        final CompletableFuture<Boolean> r5 = rheaKVStore.put(entries);
-        if (FutureHelper.get(r5)) {
-            for (final KVEntry entry : entries) {
-                LOG.info("Async put list {} with value {} success.", readUtf8(entry.getKey()),
-                    readUtf8(entry.getValue()));
+        int times = 500;
+        int batch = 500;
+        List<KVEntry> entries = new ArrayList<>(batch);
+        for (int i = 0; i < times; i++) {
+            for (int j = 0; j < batch; j++) {
+                KVEntry entry = new KVEntry(writeUtf8("key-" + i * batch + j), value);
+                entries.add(entry);
             }
+            rheaKVStore.bPut(entries);
+            rheaKVStore.bDelete("key-" + i * batch + 0);
+            entries = new ArrayList<>(batch);
         }
 
-        entries = Lists.newArrayList(kv3, kv4, kv5);
-        final boolean r6 = rheaKVStore.bPut(entries);
-        if (r6) {
-            for (final KVEntry entry : entries) {
-                LOG.info("Sync put list {} with value {} success.", readUtf8(entry.getKey()),
-                    readUtf8(entry.getValue()));
-            }
-        }
+        //        // put list
+        //        final KVEntry kv1 = new KVEntry(writeUtf8("10"), value);
+        //        final KVEntry kv2 = new KVEntry(writeUtf8("11"), value);
+        //        final KVEntry kv3 = new KVEntry(writeUtf8("12"), value);
+        //        final KVEntry kv4 = new KVEntry(writeUtf8("13"), value);
+        //        final KVEntry kv5 = new KVEntry(writeUtf8("14"), value);
+        //
+        //        List<KVEntry> entries = Lists.newArrayList(kv1, kv2, kv3);
+        //
+        //        final CompletableFuture<Boolean> r5 = rheaKVStore.put(entries);
+        //        if (FutureHelper.get(r5)) {
+        //            for (final KVEntry entry : entries) {
+        //                LOG.info("Async put list {} with value {} success.", readUtf8(entry.getKey()),
+        //                    readUtf8(entry.getValue()));
+        //            }
+        //        }
+        //
+        //        entries = Lists.newArrayList(kv3, kv4, kv5);
+        //        final boolean r6 = rheaKVStore.bPut(entries);
+        //        if (r6) {
+        //            for (final KVEntry entry : entries) {
+        //                LOG.info("Sync put list {} with value {} success.", readUtf8(entry.getKey()),
+        //                    readUtf8(entry.getValue()));
+        //            }
+        //        }
     }
 }

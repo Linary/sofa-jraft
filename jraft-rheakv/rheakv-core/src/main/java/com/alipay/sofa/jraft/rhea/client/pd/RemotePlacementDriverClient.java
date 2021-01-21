@@ -81,16 +81,19 @@ public class RemotePlacementDriverClient extends AbstractPlacementDriverClient {
 
     @Override
     protected void refreshRouteTable() {
+        // 从pd server获取cluster信息
         final Cluster cluster = this.metadataRpcClient.getClusterInfo(this.clusterId);
         if (cluster == null) {
             LOG.warn("Cluster info is empty: {}.", this.clusterId);
             return;
         }
+        // 获取这个cluster的全部store
         final List<Store> stores = cluster.getStores();
         if (stores == null || stores.isEmpty()) {
             LOG.error("Stores info is empty: {}.", this.clusterId);
             return;
         }
+        // 遍历各个store的全部region
         for (final Store store : stores) {
             final List<Region> regions = store.getRegions();
             if (regions == null || regions.isEmpty()) {

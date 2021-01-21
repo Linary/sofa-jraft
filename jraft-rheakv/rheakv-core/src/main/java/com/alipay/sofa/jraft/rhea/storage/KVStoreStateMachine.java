@@ -103,6 +103,7 @@ public class KVStoreStateMachine extends StateMachineAdapter {
                     }
                 }
                 final KVState first = kvStates.getFirstElement();
+                // 如果是同类型的操作，就收集起来
                 if (first != null && !first.isSameOp(kvOp)) {
                     applied += batchApplyAndRecycle(first.getOpByte(), kvStates);
                     kvStates = KVStateOutputList.newInstance();
@@ -114,6 +115,7 @@ public class KVStoreStateMachine extends StateMachineAdapter {
             if (!kvStates.isEmpty()) {
                 final KVState first = kvStates.getFirstElement();
                 assert first != null;
+                // 取出第一个作为操作类型
                 applied += batchApplyAndRecycle(first.getOpByte(), kvStates);
             }
         } catch (final Throwable t) {
@@ -145,7 +147,9 @@ public class KVStoreStateMachine extends StateMachineAdapter {
             this.batchWriteHistogram.update(size);
 
             // do batch apply
-            batchApply(opByte, kvStates);
+            // 重点：批量应用
+            System.out.println("Rhea => 批量应用 " + kvStates.size() + " 条日志");
+            this.batchApply(opByte, kvStates);
 
             return size;
         } finally {
@@ -156,6 +160,7 @@ public class KVStoreStateMachine extends StateMachineAdapter {
     private void batchApply(final byte opType, final KVStateOutputList kvStates) {
         switch (opType) {
             case KVOperation.PUT:
+                // 反正这里是一个同步操作
                 this.rawKVStore.batchPut(kvStates);
                 break;
             case KVOperation.PUT_IF_ABSENT:
@@ -213,7 +218,7 @@ public class KVStoreStateMachine extends StateMachineAdapter {
                 this.rawKVStore.batchResetSequence(kvStates);
                 break;
             case KVOperation.RANGE_SPLIT:
-                doSplit(kvStates);
+                this.doSplit(kvStates);
                 break;
             default:
                 throw new IllegalKVOperationException("Unknown operation: " + opType);
@@ -251,6 +256,7 @@ public class KVStoreStateMachine extends StateMachineAdapter {
 
     @Override
     public boolean onSnapshotLoad(final SnapshotReader reader) {
+        // 刚启动的时候，Node可能还没构造好，所以不能用Node.isLeader判断自己是不是leader
         if (isLeader()) {
             LOG.warn("Leader is not supposed to load snapshot.");
             return false;

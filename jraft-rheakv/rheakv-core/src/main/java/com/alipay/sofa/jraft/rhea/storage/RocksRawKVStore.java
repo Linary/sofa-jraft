@@ -46,6 +46,7 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.Env;
 import org.rocksdb.EnvOptions;
+import org.rocksdb.Holder;
 import org.rocksdb.IngestExternalFileOptions;
 import org.rocksdb.Options;
 import org.rocksdb.ReadOptions;
@@ -289,7 +290,7 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> implements 
         readLock.lock();
         try {
             boolean exists = false;
-            if (this.db.keyMayExist(key, new StringBuilder(0))) {
+            if (this.db.keyMayExist(key, new Holder<>(BytesUtil.EMPTY_BYTES))) {
                 exists = this.db.get(key) != null;
             }
             setSuccess(closure, exists);
@@ -1436,6 +1437,7 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> implements 
             final String tempPath = snapshotPath + "_temp";
             final File tempFile = new File(tempPath);
             FileUtils.deleteDirectory(tempFile);
+
             checkpoint.createCheckpoint(tempPath);
             final File snapshotFile = new File(snapshotPath);
             FileUtils.deleteDirectory(snapshotFile);
@@ -1463,12 +1465,14 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> implements 
                 return;
             }
             closeRocksDB();
+
             final String dbPath = this.opts.getDbPath();
             final File dbFile = new File(dbPath);
             FileUtils.deleteDirectory(dbFile);
             if (!snapshotFile.renameTo(dbFile)) {
                 throw new StorageException("Fail to rename [" + snapshotPath + "] to [" + dbPath + "].");
             }
+
             // reopen the db
             openRocksDB(this.opts);
         } catch (final Exception e) {

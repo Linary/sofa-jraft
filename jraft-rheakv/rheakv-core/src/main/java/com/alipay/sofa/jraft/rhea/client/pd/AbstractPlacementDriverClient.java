@@ -98,6 +98,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                     // if blank, extends parent's value
                     regionRouteTableOpts.setInitialServerList(initialServerList);
                 }
+                // 初始化路由表
                 initRouteTableByRegion(regionRouteTableOpts);
             }
         }
@@ -222,10 +223,13 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
 
     @Override
     public Endpoint getLeader(final long regionId, final boolean forceRefresh, final long timeoutMillis) {
+        //这里会根据clusterName和regionId拼接出raftGroupId
         final String raftGroupId = JRaftHelper.getJRaftGroupId(this.clusterName, regionId);
+        //去路由表里找这个集群的leader
         PeerId leader = getLeader(raftGroupId, forceRefresh, timeoutMillis);
         if (leader == null && !forceRefresh) {
             // Could not found leader from cache, try again and force refresh cache
+            // 如果第一次没有找到，那么执行强制刷新的方法再找一次
             leader = getLeader(raftGroupId, true, timeoutMillis);
         }
         if (leader == null) {
@@ -236,6 +240,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
 
     protected PeerId getLeader(final String raftGroupId, final boolean forceRefresh, final long timeoutMillis) {
         final RouteTable routeTable = RouteTable.getInstance();
+        //是否要强制刷新路由表
         if (forceRefresh) {
             final long deadline = System.currentTimeMillis() + timeoutMillis;
             final StringBuilder error = new StringBuilder();
@@ -244,6 +249,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
             Throwable lastCause = null;
             for (;;) {
                 try {
+                    //刷新节点路由表
                     final Status st = routeTable.refreshLeader(this.cliClientService, raftGroupId, 2000);
                     if (st.isOk()) {
                         break;
@@ -255,6 +261,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                     lastCause = t;
                     error.append(t.getMessage());
                 }
+                //如果还没有到截止时间，那么sleep10毫秒之后再刷新
                 if (System.currentTimeMillis() < deadline) {
                     LOG.debug("Fail to find leader, retry again, {}.", error);
                     error.append(", ");
@@ -263,12 +270,14 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                     } catch (final InterruptedException e) {
                         ThrowUtil.throwException(e);
                     }
+                    //到了截止时间，那么抛出异常
                 } else {
                     throw lastCause != null ? new RouteTableException(error.toString(), lastCause)
                         : new RouteTableException(error.toString());
                 }
             }
         }
+        //返回路由表里面的leader
         return routeTable.selectLeader(raftGroupId);
     }
 

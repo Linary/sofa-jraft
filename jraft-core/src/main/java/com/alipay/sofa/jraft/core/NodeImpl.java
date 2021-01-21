@@ -171,6 +171,7 @@ public class NodeImpl implements Node, RaftServerService {
                                                                                                         .writeLock();
     protected final Lock                                                   readLock                 = this.readWriteLock
                                                                                                         .readLock();
+    // 用这个来表征节点的状态
     private volatile State                                                 state;
     private volatile CountDownLatch                                        shutdownLatch;
     private long                                                           currTerm;
@@ -1172,7 +1173,7 @@ public class NodeImpl implements Node, RaftServerService {
             this.metaStorage.setTermAndVotedFor(this.currTerm, this.serverId);
             this.voteCtx.grant(this.serverId);
             if (this.voteCtx.isGranted()) {
-                becomeLeader();
+                this.becomeLeader();
             }
         } finally {
             this.writeLock.unlock();
@@ -1217,7 +1218,7 @@ public class NodeImpl implements Node, RaftServerService {
         LOG.info("Node {} become leader of group, term={}, conf={}, oldConf={}.", getNodeId(), this.currTerm,
             this.conf.getConf(), this.conf.getOldConf());
         // cancel candidate vote timer
-        stopVoteTimer();
+        this.stopVoteTimer();
         this.state = State.STATE_LEADER;
         this.leaderId = this.serverId.copy();
         this.replicatorGroup.resetTerm(this.currTerm);
@@ -3183,7 +3184,6 @@ public class NodeImpl implements Node, RaftServerService {
             this.stopTransferArg = stopArg;
             this.transferTimer = this.timerManager.schedule(() -> onTransferTimeout(stopArg),
                 this.options.getElectionTimeoutMs(), TimeUnit.MILLISECONDS);
-
         } finally {
             this.writeLock.unlock();
         }
@@ -3227,6 +3227,7 @@ public class NodeImpl implements Node, RaftServerService {
                 .setTerm(this.currTerm + 1) //
                 .setSuccess(true) //
                 .build();
+
             // Parallelize response and election
             done.sendResponse(resp);
             doUnlock = false;

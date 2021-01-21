@@ -643,7 +643,6 @@ public class DefaultRegionKVService implements RegionKVService {
             final Long newRegionId = KVParameterRequires.requireNonNull(request.getNewRegionId(),
                 "rangeSplit.newRegionId");
             this.regionEngine.getStoreEngine().applySplit(request.getRegionId(), newRegionId, new BaseKVStoreClosure() {
-
                 @Override
                 public void run(final Status status) {
                     if (status.isOk()) {

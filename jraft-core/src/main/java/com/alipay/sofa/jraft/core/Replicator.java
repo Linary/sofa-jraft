@@ -706,7 +706,6 @@ public class Replicator implements ThreadId.OnError {
                     heartbeatDone = heartBeatClosure;
                 } else {
                     heartbeatDone = new RpcResponseClosureAdapter<AppendEntriesResponse>() {
-
                         @Override
                         public void run(final Status status) {
                             onHeartbeatReturned(Replicator.this.id, status, request, getResponse(), monotonicSendTimeMs);
@@ -805,6 +804,7 @@ public class Replicator implements ThreadId.OnError {
             throw new IllegalArgumentException("Invalid ReplicatorOptions.");
         }
         final Replicator r = new Replicator(opts, raftOptions);
+        // 建立出口通道
         if (!r.rpcService.connect(opts.getPeerId().getEndpoint())) {
             LOG.error("Fail to init sending channel to {}.", opts.getPeerId());
             // Return and it will be retried later.
@@ -833,6 +833,9 @@ public class Replicator implements ThreadId.OnError {
         r.lastRpcSendTimestamp = Utils.monotonicMs();
         r.startHeartbeatTimer(Utils.nowMs());
         // id.unlock in sendEmptyEntries
+        // 这里就开始向follower发送消息，然后进入消息循环，但是这种怎么保证在接收到客户端
+        // 请求后日志确实同步到了大多数节点呢？
+        // 获取Follower的LastLogIndex
         r.sendEmptyEntries(false);
         return r.id;
     }
@@ -946,6 +949,7 @@ public class Replicator implements ThreadId.OnError {
         final long dueTime = startTimeMs + this.options.getDynamicHeartBeatTimeoutMs();
         try {
             LOG.debug("Blocking {} for {} ms", this.options.getPeerId(), this.options.getDynamicHeartBeatTimeoutMs());
+            // 这里是使用一个延时调度的方式，让下一次发送心跳信息稍微慢一点
             this.blockTimer = this.timerManager.schedule(() -> onBlockTimeout(this.id), dueTime - Utils.nowMs(),
                 TimeUnit.MILLISECONDS);
             this.statInfo.runningState = RunningState.BLOCKING;
@@ -1212,7 +1216,6 @@ public class Replicator implements ThreadId.OnError {
             int processed = 0;
             while (!holdingQueue.isEmpty()) {
                 final RpcResponse queuedPipelinedResponse = holdingQueue.peek();
-
                 // Sequence mismatch, waiting for next response.
                 if (queuedPipelinedResponse.seq != r.requiredNextSeq) {
                     if (processed > 0) {
