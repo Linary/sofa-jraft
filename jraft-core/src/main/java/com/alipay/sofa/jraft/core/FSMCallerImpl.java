@@ -233,10 +233,12 @@ public class FSMCallerImpl implements FSMCaller {
             return false;
         }
         if (!this.taskQueue.tryPublishEvent(tpl)) {
-//            LOG.info("Try publish event failed, blocked publish it");
-//            this.taskQueue.publishEvent(tpl);
-            setError(new RaftException(ErrorType.ERROR_TYPE_STATE_MACHINE, new Status(RaftError.EBUSY,
-                     "FSMCaller is overload.")));
+            // LOG.info("Try publish event failed, blocked publish it");
+            // this.taskQueue.publishEvent(tpl);
+            //            if (tpl.getEnd() - this.lastAppliedIndex > threshold)
+            LOG.warn("FSMCaller is overload, the node {} is busy, please slow down sync raft logs", this.node);
+            //            setError(new RaftException(ErrorType.ERROR_TYPE_STATE_MACHINE, new Status(RaftError.EBUSY,
+            //                "FSMCaller is overload.")));
             return false;
         }
         return true;
@@ -523,7 +525,7 @@ public class FSMCallerImpl implements FSMCaller {
             this.lastAppliedTerm = lastTerm;
             this.logManager.setAppliedId(lastAppliedId);
             notifyLastAppliedIndexUpdated(lastIndex);
-//            System.out.println("Applying task, lastAppliedIndex = " + lastAppliedIndex + "\t" + "applyingIndex = " + applyingIndex);
+            //            System.out.println("Applying task, lastAppliedIndex = " + lastAppliedIndex + "\t" + "applyingIndex = " + applyingIndex);
         } finally {
             this.nodeMetrics.recordLatency("fsm-commit", Utils.monotonicMs() - startMs);
         }

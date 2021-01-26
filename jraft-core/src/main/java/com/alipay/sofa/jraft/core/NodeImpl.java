@@ -81,6 +81,7 @@ import com.alipay.sofa.jraft.option.SnapshotExecutorOptions;
 import com.alipay.sofa.jraft.rpc.RaftClientService;
 import com.alipay.sofa.jraft.rpc.RaftServerService;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
+import com.alipay.sofa.jraft.rpc.RpcRequests;
 import com.alipay.sofa.jraft.rpc.RpcRequests.AppendEntriesRequest;
 import com.alipay.sofa.jraft.rpc.RpcRequests.AppendEntriesResponse;
 import com.alipay.sofa.jraft.rpc.RpcRequests.InstallSnapshotRequest;
@@ -1961,7 +1962,13 @@ public class NodeImpl implements Node, RaftServerService {
                 doUnlock = false;
                 this.writeLock.unlock();
                 // see the comments at FollowerStableClosure#run()
-                this.ballotBox.setLastCommittedIndex(Math.min(request.getCommittedIndex(), prevLogIndex));
+                if (!this.ballotBox.setLastCommittedIndex(Math.min(request.getCommittedIndex(), prevLogIndex))) {
+                    // follower statemachine is busy
+                    RpcRequests.ErrorResponse.Builder builder = RpcRequests.ErrorResponse.newBuilder();
+                    builder.setErrorCode(666);
+                    builder.setErrorMsg("StateMachine is busy");
+                    respBuilder.setErrorResponse(builder.build());
+                }
                 return respBuilder.build();
             }
 
@@ -2001,6 +2008,7 @@ public class NodeImpl implements Node, RaftServerService {
 
             final FollowerStableClosure closure = new FollowerStableClosure(request, AppendEntriesResponse.newBuilder()
                 .setTerm(this.currTerm), this, done, this.currTerm);
+            // Append to logManager
             this.logManager.appendEntries(entries, closure);
             // update configuration after _log_manager updated its memory status
             checkAndSetConfiguration(true);

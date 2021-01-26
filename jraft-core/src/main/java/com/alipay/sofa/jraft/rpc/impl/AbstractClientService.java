@@ -225,8 +225,13 @@ public abstract class AbstractClientService implements ClientService {
                                 .findFieldByNumber(RpcResponseFactory.ERROR_RESPONSE_NUM);
                             if (fd != null && ((Message) result).hasField(fd)) {
                                 final ErrorResponse eResp = (ErrorResponse) ((Message) result).getField(fd);
-                                status = handleErrorResponse(eResp);
-                                msg = eResp;
+                                if (eResp.getErrorCode() != 666) {
+                                    status = handleErrorResponse(eResp);
+                                    msg = eResp;
+                                } else {
+                                    // Let status = ok
+                                    msg = (T) result;
+                                }
                             } else {
                                 msg = (T) result;
                             }

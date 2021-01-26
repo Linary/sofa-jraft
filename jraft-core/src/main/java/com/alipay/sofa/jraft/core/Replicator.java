@@ -209,6 +209,7 @@ public class Replicator implements ThreadId.OnError {
     enum ReplicatorEvent {
         CREATED, // created
         ERROR, // error
+        FSM_BUSY, // busy
         DESTROYED // destroyed
     }
 
@@ -236,6 +237,14 @@ public class Replicator implements ThreadId.OnError {
          * @param status replicator's error detailed status
          */
         void onError(final PeerId peer, final Status status);
+
+        /**
+         * Called when this replicator was in busy.
+         *
+         * @param peer   replicator related peerId
+         * @param status replicator's error detailed status
+         */
+        default void onBusy(final PeerId peer, final Status status) {}
 
         /**
          * Called when this replicator has been destroyed.
@@ -269,6 +278,9 @@ public class Replicator implements ThreadId.OnError {
                             break;
                         case ERROR:
                             RpcUtils.runInThread(() -> listener.onError(peer, status));
+                            break;
+                        case FSM_BUSY:
+                            RpcUtils.runInThread(() -> listener.onBusy(peer, status));
                             break;
                         case DESTROYED:
                             RpcUtils.runInThread(() -> listener.onDestroyed(peer));
@@ -1162,6 +1174,12 @@ public class Replicator implements ThreadId.OnError {
             }
             if (rpcSendTime > r.lastRpcSendTimestamp) {
                 r.lastRpcSendTimestamp = rpcSendTime;
+            }
+
+            if (response.getErrorResponse() != null) {
+                if (response.getErrorResponse().getErrorCode() == 666) {
+                    notifyReplicatorStatusListener(r, ReplicatorEvent.FSM_BUSY);
+                }
             }
             r.startHeartbeatTimer(startTimeMs);
         } finally {

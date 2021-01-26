@@ -95,7 +95,8 @@ public class RaftRpcServerFactory {
     public static void addRaftRequestProcessors(final RpcServer rpcServer, final Executor raftExecutor,
                                                 final Executor cliExecutor) {
         // raft core processors
-        final AppendEntriesRequestProcessor appendEntriesRequestProcessor = new AppendEntriesRequestProcessor(raftExecutor);
+        final AppendEntriesRequestProcessor appendEntriesRequestProcessor = new AppendEntriesRequestProcessor(
+            raftExecutor);
         rpcServer.registerConnectionClosedEventListener(appendEntriesRequestProcessor);
         rpcServer.registerProcessor(appendEntriesRequestProcessor);
         rpcServer.registerProcessor(new GetFileRequestProcessor(raftExecutor));
