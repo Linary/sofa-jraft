@@ -91,6 +91,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
         ExtSerializerSupports.init();
     }
 
+    // 为什么既有regionKVServiceTable，又有regionEngineTable，它们里面持有的RegionEngine是一样的
     private final ConcurrentMap<Long, RegionKVService> regionKVServiceTable = Maps.newConcurrentMapLong();
     private final ConcurrentMap<Long, RegionEngine>    regionEngineTable    = Maps.newConcurrentMapLong();
     private final StateListenerContainer<Long>         stateListenerContainer;
@@ -215,7 +216,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
             return false;
         }
         // init db store
-        if (!initRawKVStore(opts)) {
+        if (!this.initRawKVStore(opts)) {
             return false;
         }
         if (this.rawKVStore instanceof Describer) {
@@ -463,16 +464,19 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
     public void applySplit(final Long regionId, final Long newRegionId, final KVStoreClosure closure) {
         Requires.requireNonNull(regionId, "regionId");
         Requires.requireNonNull(newRegionId, "newRegionId");
+        // 如果regionEngineTable已经包含了新region的id，就返回"有冲突的region"
         if (this.regionEngineTable.containsKey(newRegionId)) {
             closure.setError(Errors.CONFLICT_REGION_ID);
             closure.run(new Status(-1, "Conflict region id %d", newRegionId));
             return;
         }
+        // 标记正在分裂，如果已经正在分裂了，就返回错误
         if (!this.splitting.compareAndSet(false, true)) {
             closure.setError(Errors.SERVER_BUSY);
             closure.run(new Status(-1, "Server is busy now"));
             return;
         }
+        // 获取原始region的id
         final RegionEngine parentEngine = getRegionEngine(regionId);
         if (parentEngine == null) {
             closure.setError(Errors.NO_REGION_FOUND);
@@ -486,9 +490,11 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
             this.splitting.set(false);
             return;
         }
+        // 上面全是异常情况检查
         final Region parentRegion = parentEngine.getRegion();
         final byte[] startKey = BytesUtil.nullToEmpty(parentRegion.getStartKey());
         final byte[] endKey = parentRegion.getEndKey();
+        // 获取当前range的keys估算列表
         final long approximateKeys = this.rawKVStore.getApproximateKeysInRange(startKey, endKey);
         final long leastKeysOnSplit = this.storeOpts.getLeastKeysOnSplit();
         if (approximateKeys < leastKeysOnSplit) {
@@ -497,6 +503,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
             this.splitting.set(false);
             return;
         }
+        // 跳到approximateKeys的一半
         final byte[] splitKey = this.rawKVStore.jumpOver(startKey, approximateKeys >> 1);
         if (splitKey == null) {
             closure.setError(Errors.STORAGE_ERROR);
@@ -504,6 +511,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
             this.splitting.set(false);
             return;
         }
+        // 将rangsplit包装成一个operation
         final KVOperation op = KVOperation.createRangeSplit(splitKey, regionId, newRegionId);
         final Task task = new Task();
         task.setData(ByteBuffer.wrap(Serializers.getDefault().writeObject(op)));
@@ -683,7 +691,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions>, Describer {
             final RegionEngine engine = new RegionEngine(region, this);
             if (engine.init(rOpts)) {
                 final RegionKVService regionKVService = new DefaultRegionKVService(engine);
-                registerRegionKVService(regionKVService);
+                this.registerRegionKVService(regionKVService);
                 this.regionEngineTable.put(region.getId(), engine);
             } else {
                 LOG.error("Fail to init [RegionEngine: {}].", region);

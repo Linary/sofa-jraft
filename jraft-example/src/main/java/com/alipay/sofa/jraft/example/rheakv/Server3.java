@@ -16,6 +16,7 @@
  */
 package com.alipay.sofa.jraft.example.rheakv;
 
+import com.alipay.sofa.jraft.option.NodeOptions;
 import com.alipay.sofa.jraft.rhea.options.PlacementDriverOptions;
 import com.alipay.sofa.jraft.rhea.options.RheaKVStoreOptions;
 import com.alipay.sofa.jraft.rhea.options.StoreEngineOptions;

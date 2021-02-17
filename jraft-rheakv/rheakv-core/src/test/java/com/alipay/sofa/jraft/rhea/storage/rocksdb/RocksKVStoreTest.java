@@ -887,7 +887,8 @@ public class RocksKVStoreTest extends BaseKVStoreTest {
         }
         this.kvStore.put(entries, null);
 
-        long approximateKeys = this.kvStore.getApproximateKeysInRange(makeKey("approximate_test" + 9999), null);
+        //        long approximateKeys = this.kvStore.getApproximateKeysInRange(makeKey("approximate_test" + 9999), null);
+        long approximateKeys = this.kvStore.getApproximateKeysInRange(makeKey("approximate_tesa"), null);
         assertEquals(1, approximateKeys);
         approximateKeys = this.kvStore.getApproximateKeysInRange(null, makeKey("approximate_test" + 9999));
         assertEquals(10000, approximateKeys);

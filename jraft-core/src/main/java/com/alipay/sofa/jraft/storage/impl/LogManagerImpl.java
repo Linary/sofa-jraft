@@ -329,11 +329,17 @@ public class LogManagerImpl implements LogManager {
                 event.type = EventType.OTHER;
                 event.done = done;
             };
+            final int sleepTime = 1000;
             while (true) {
                 if (tryOfferEvent(done, translator)) {
                     break;
                 } else {
                     retryTimes++;
+                    try {
+                        Thread.sleep(retryTimes * sleepTime);
+                    } catch (InterruptedException e) {
+                        // pass
+                    }
                     if (retryTimes > APPEND_LOG_RETRY_TIMES) {
                         reportError(RaftError.EBUSY.getNumber(), "LogManager is busy, disk queue overload.");
                         return;
@@ -466,6 +472,7 @@ public class LogManagerImpl implements LogManager {
                         } else {
                             st = Status.OK();
                         }
+                        // 这里是往disruptor里面扔一个task event
                         this.storage.get(i).run(st);
                     } catch (Throwable t) {
                         LOG.error("Fail to run closure with status: {}.", st, t);

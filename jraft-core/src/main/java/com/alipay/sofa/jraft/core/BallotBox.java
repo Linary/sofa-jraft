@@ -238,7 +238,9 @@ public class BallotBox implements Lifecycle<BallotBoxOptions>, Describer {
                 this.lastCommittedIndex = lastCommittedIndex;
                 this.stampedLock.unlockWrite(stamp);
                 doUnlock = false;
-                this.waiter.onCommitted(lastCommittedIndex);
+                if (!this.waiter.onCommitted(lastCommittedIndex)) {
+                    return false;
+                }
             }
         } finally {
             if (doUnlock) {
